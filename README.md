@@ -179,11 +179,24 @@ This should save a file called `metrics.csv` with image/video imperceptibility m
 For instance, running the eval script for the default `videoseal` model on high-resolution videos from the SA-V dataset should give metrics similar to [sav_256b_metrics](https://dl.fbaipublicfiles.com/videoseal/sav_256b_metrics.csv).
 
 
-## Training
+## More details
+
+### Training
 
 We provide training code to reproduce our models or train your own models. This includes image and video training (we recommand training on image first, even if you wish to do video).
 See [docs/training.md](docs/training.md) for detailed instructions on data preparation, training commands, and pre-trained model checkpoints.
 
+### Inference
+
+Here are some important parameters for the models:
+* **`scaling_w`**: Controls the global watermark strength (default `0.2`). Higher values increase robustness against attacks but make the watermark more visible; lower values improve imperceptibility.
+* **`attenuation`**: Enables Just Noticeable Difference (JND) masking. The JND model builds a heatmap that is high when there is a lot of texture, and low otherwise. It allows the model to hide stronger watermarks in these textured areas while preserving smooth regions. By default the `videoseal_1.0` model uses a JND heatmap (the one present in [modules/jnd.py](https://github.com/facebookresearch/videoseal/blob/main/videoseal/modules/jnd.py)).
+
+You can also modify some model attributes after loading.
+```python
+# Example: updating parameters on an already loaded model
+model.blender.scaling_w = 0.4   # Increase strength (more robust)
+```
 
 ## License
 
