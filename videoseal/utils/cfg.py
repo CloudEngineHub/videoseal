@@ -245,8 +245,27 @@ def is_url(string):
 
 
 def maybe_download_checkpoint(url):
+    """
+    Download checkpoint from URL if not already cached locally.
+    
+    Creates unique filenames using parent_dir_filename pattern to avoid collisions.
+    Example: ".../chunkyseal/checkpoint.pth" -> "ckpts/chunkyseal_checkpoint.pth"
+    
+    Args:
+        url (str): Checkpoint URL
+        
+    Returns:
+        str: Absolute path to checkpoint file
+    """
     try:
-        basename = urlparse(url).path.split("/")[-1]
+        # Extract path components to create unique filename
+        # For URLs like .../videoseal/chunkyseal/checkpoint.pth, use chunkyseal_checkpoint.pth
+        path_parts = urlparse(url).path.split("/")
+        if len(path_parts) >= 2:
+            # Use parent directory + filename to make it unique
+            basename = f"{path_parts[-2]}_{path_parts[-1]}"
+        else:
+            basename = path_parts[-1]
         os.makedirs("ckpts", exist_ok=True)
         filename = os.path.abspath(os.path.join("ckpts", basename))
 
