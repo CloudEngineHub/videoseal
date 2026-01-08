@@ -119,7 +119,7 @@ We provide a comprehensive suite of watermarking models with different trade-off
 
 | Model | Capacity | Best For | Model Card | Checkpoint | Paper | Status |
 |:------|:--------:|:---------|:----------:|:----------:|:-----:|:------:|
-| **PixelSeal** | 256 bits | **SOTA Robustness & Imperceptibility** | [`pixelseal.yaml`](videoseal/cards/pixelseal.yaml) | [pixelseal/checkpoint.pth](https://dl.fbaipublicfiles.com/videoseal/pixelseal/checkpoint.pth) | [Link](#pixelseal-adversarial-only-training-for-invisible-watermarking) | 🆕 New |
+| **PixelSeal** | 256 bits | **SOTA Robustness & Imperceptibility** | [`pixelseal.yaml`](videoseal/cards/pixelseal.yaml) | [pixelseal/checkpoint.pth](https://dl.fbaipublicfiles.com/videoseal/pixelseal/checkpoint.pth) | [arXiv:2512.16874](https://arxiv.org/abs/2512.16874) | 🆕 New |
 | **ChunkySeal** | **1024 bits** | **High Capacity larger model** | [`chunkyseal.yaml`](videoseal/cards/chunkyseal.yaml) | [chunkyseal/checkpoint.pth](https://dl.fbaipublicfiles.com/videoseal/chunkyseal/checkpoint.pth) | [arXiv:2510.12812](https://arxiv.org/abs/2510.12812) | 🆕 New |
 | **VideoSeal v1.0** | 256 bits | **Stable** | [`videoseal_1.0.yaml`](videoseal/cards/videoseal_1.0.yaml) | [y_256b_img.pth](https://dl.fbaipublicfiles.com/videoseal/y_256b_img.pth) | [arXiv:2412.09492](https://arxiv.org/abs/2412.09492) | ✅ Stable |
 | VideoSeal v0.0 | 96 bits | Legacy Baseline | [`videoseal_0.0.yaml`](videoseal/cards/videoseal_0.0.yaml) | [rgb_96b.pth](https://dl.fbaipublicfiles.com/videoseal/rgb_96b.pth) | [arXiv:2412.09492](https://arxiv.org/abs/2412.09492) | 🟡 Legacy |
@@ -265,7 +265,7 @@ Despite rapid progress in deep learning-based image watermarking, the capacity o
 ```bibtex
 @misc{petrov2025hidebits,
   title={We Can Hide More Bits: The Unused Watermarking Capacity in Theory and in Practice}, 
-  author={Aleksandar Petrov and Pierre Fernandez and Tomáš Souček and Hady Elsahar},
+  author={Aleksandar Petrov and Pierre Fernandez and Tom\'{a}\v{s} Sou\v{c}ek and Hady Elsahar},
   year={2025},
   eprint={2510.12812},
   archivePrefix={arXiv},
@@ -285,7 +285,8 @@ This work introduces **adversarial-only training** that eliminates unreliable pe
 ```bibtex
 @article{soucek2025pixelseal,
   title={Pixel Seal: Adversarial-only Training for Invisible Image and Video Watermarking},
-  author={Souček, Tomáš and Fernandez, Pierre and Elsahar, Hady and Rebuffi, Sylvestre-Alvise and Lacatusu, Valeriu and Tran, Tuan and Sander, Tom and Mourachko, Alexandre},
+  author={Sou\v{c}ek, Tom\'{a}\v{s} and Fernandez, Pierre and Elsahar, Hady and Rebuffi, Sylvestre-Alvise and Lacatusu, Valeriu and Tran, Tuan and Sander, Tom and Mourachko, Alexandre},
+  journal={arXiv preprint arXiv:2512.16874},
   year={2025}
 }
 ```
@@ -299,10 +300,10 @@ This work introduces **adversarial-only training** that eliminates unreliable pe
 **NeurIPS 2025 Spotlight** 🏅 | [Virtual Site](https://neurips.cc/virtual/2025/loc/san-diego/poster/115131)
 
 ```bibtex
-@article{soucek2025wmforger,
+@inproceedings{soucek2025wmforger,
   title={Transferable Black-Box One-Shot Forging of Watermarks via Image Preference Models},
-  author={Souček, Tomáš and Rebuffi, Sylvestre-Alvise and Fernandez, Pierre and Jovanović, Nikola and Elsahar, Hady and Lacatusu, Valeriu and Tran, Tuan and Mourachko, Alexandre},
-  journal={arXiv preprint arXiv:2510.20468},
+  author={Sou\v{c}ek, Tom\'{a}\v{s} and Rebuffi, Sylvestre-Alvise and Fernandez, Pierre and Jovanović, Nikola and Elsahar, Hady and Lacatusu, Valeriu and Tran, Tuan and Mourachko, Alexandre},
+  booktitle={Advances in Neural Information Processing Systems},
   year={2025}
 }
 ```
