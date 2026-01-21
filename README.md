@@ -1,58 +1,94 @@
-# :movie_camera: :seal: Video Seal: Open and Efficient Video Watermarking
+<div align="center">
 
-Official implementation of [Video Seal](https://ai.meta.com/research/publications/video-seal-open-and-efficient-video-watermarking/).
-Training and inference code for **image and video watermarking**, and **state-of-the-art open-sourced models**.
+# 🎥 🦭 VideoSeal: SOTA Invisible Watermarking Models for Images & Videos
 
-This repository includes pre-trained models, training code, inference code, and evaluation tools, all released under the MIT license, as well as baselines of state-of-the-art image watermarking models adapted for video watermarking (including MBRS, CIN, TrustMark, and WAM) allowing for free use, modification, and distribution of the code and models. 
+[![Demo](https://img.shields.io/badge/🌐_Demo-Try_Now-blue)](https://aidemos.meta.com/videoseal)
+[![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/facebookresearch/videoseal/blob/main/notebooks/colab.ipynb)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[[`paper`](https://ai.meta.com/research/publications/video-seal-open-and-efficient-video-watermarking/)]
-[[`arXiv`](https://arxiv.org/abs/2412.09492)]
-[[`Colab`](https://colab.research.google.com/github/facebookresearch/videoseal/blob/main/notebooks/colab.ipynb)]
-[[`Demo`](https://aidemos.meta.com/videoseal)]
+<table align="center">
+  <tr>
+    <td align="center"><b><a href="https://arxiv.org/abs/2412.09492">VideoSeal</a></b></td>
+    <td align="center"><b><a href="#pixelseal-adversarial-only-training-for-invisible-watermarking">PixelSeal</a></b></td>
+    <td align="center"><b><a href="https://arxiv.org/abs/2510.12812">ChunkySeal</a></b></td>
+    <td align="center"><b><a href="https://arxiv.org/abs/2510.20468">WmForger</a></b></td>
+  </tr>
+  <tr>
+    <td align="center"><a href="https://arxiv.org/abs/2412.09492"><img src="https://img.shields.io/badge/arXiv-2412.09492-b31b1b.svg" alt="arXiv"></a></td>
+    <td align="center"><a href="https://arxiv.org/abs/2512.16874"><img src="https://img.shields.io/badge/arXiv-2512.16874-b31b1b.svg" alt="arXiv"></a></td>
+    <td align="center"><a href="https://arxiv.org/abs/2510.12812"><img src="https://img.shields.io/badge/arXiv-2510.12812-b31b1b.svg" alt="arXiv"></a></td>
+    <td align="center"><a href="https://arxiv.org/abs/2510.20468"><img src="https://img.shields.io/badge/arXiv-2510.20468-b31b1b.svg" alt="arXiv"></a></td>
+  </tr>
+</table>
+
+</div>
+
+---
+
+## 🔥 Highlights
+
+<div align="center">
+  <img src="docs/images/figure-pixelseal.png" width="100%" alt="PixelSeal Performance"/>
+  <br>
+  <em><b>PixelSeal</b> achieves state-of-the-art robustness-imperceptibility trade-off, positioning at the Pareto frontier</em>
+</div>
+
+<br>
+
+- 🏆 **PixelSeal**: SOTA imperceptibility & robustness through adversarial-only training and JND-based attenuation
+- 🚀 **ChunkySeal**: 4× capacity increase (1024 bits) - proving watermarking limits are far from reached
+- 🎬 **VideoSeal**: Efficient image & video watermarking with temporal consistency
+- 🔓 **Open Source**: All models, training code, and evaluation tools released under MIT license
+
+---
+
+## 📰 Latest Updates
+
+- **December 2025**: 🆕 **ChunkySeal** and **PixelSeal** released! Model cards and checkpoints now available
+- **October 2025**: 🏅 [**WmForger**](https://arxiv.org/abs/2510.20468) accepted to **NeurIPS 2025 as Spotlight**! Code in [`wmforger/`](wmforger/)
+- **March 2025**: VideoSeal v1.0 with improved 256-bit model and enhanced robustness
+- **December 2024**: Initial VideoSeal release with 96-bit baseline model
 
 
-## ⭐ What's New
+## 🚀 Quick start
 
-- **October 2025**: Follow-up work on [watermark forging](https://arxiv.org/abs/2510.20468) has been accepted to **NeurIPS 2025** as spotlight 🏅! The code and model are released in the [`wmforger/`](https://github.com/facebookresearch/videoseal/tree/main/wmforger) folder. Try it yourself!
-- **March 2025**: New image models, including 256-bit model with stronger robustness and imperceptibility. Updates to the codebase for better performance and usability.
-- **December 2024**: Initial release of Video Seal, including 96-bit model, baselines and video inference and training code.
-
-
-## Quick start
-
-Here is quick standalone entry point loading the VideoSeal model as a TorchScript:
 ```python
-import os
+import videoseal
 from PIL import Image
-import torch
-import torchvision
-from torchvision.transforms.functional import to_tensor, to_pil_image
+import torchvision.transforms as T
 
-# Download the model and load it.
-os.makedirs("ckpts", exist_ok=True)
-if not os.path.exists("ckpts/y_256b_img.jit"):
-    os.system("wget https://dl.fbaipublicfiles.com/videoseal/y_256b_img.jit -P ckpts/")
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = torch.jit.load("ckpts/y_256b_img.jit").to(device).eval()
+# Load any model by name (automatically downloads on first use)
+model = videoseal.load("videoseal")     # VideoSeal v1.0 (256-bit, stable)
+# model = videoseal.load("pixelseal")   # PixelSeal (SOTA imperceptibility & robustness)
+# model = videoseal.load("chunkyseal")  # ChunkySeal (1024-bit high capacity)
 
-# Image watermarking in 3 lines.
-img = to_tensor(Image.open("image.jpg")).unsqueeze(0).to(device)
-msg = torch.randint(0, 2, (1, 256)).float().to(device)
-img_watermarked = model.embed(img, msg)
-# Video watermarking in 3 lines.
-video = torchvision.io.read_video("video.mp4")[0].permute(0, 3, 1, 2)  # TCHW format
-video = (video.float() / 255.0).to(device)[:16]  # First 16 frames to avoid OOMs
-video_watermarked = model.embed(video, msg, is_video=True)
+# Watermark an image 🎨
+img_tensor = T.ToTensor()(Image.open("image.jpg")).unsqueeze(0)
+outputs = model.embed(img_tensor)
+T.ToPILImage()(outputs["imgs_w"][0]).save("watermarked.jpg")
 
-# Image detection.
-img_watermarked = to_tensor(Image.open("image_watermarked.jpg")).unsqueeze(0).to(device)
-preds = model.detect(img_watermarked)
-# Video detection.
-video_watermarked = torchvision.io.read_video("video_watermarked.mp4")[0].permute(0, 3, 1, 2)
-video_watermarked = (video_watermarked.float() / 255.0).to(device)
-preds = model.detect(video_watermarked, is_video=True)
+# Detect watermarks
+detected = model.detect(img_tensor)
+hidden_message = (detected["preds"][0, 1:] > 0).float()  # Binary message
 ```
-More info on the TorchScript functions and parameters at [docs/torchscript.md](https://github.com/facebookresearch/videoseal/blob/main/docs/torchscript.md).
+
+**Video watermarking:**
+
+```python
+import videoseal
+import torchvision
+
+# Load and watermark video 🎬
+model = videoseal.load("videoseal")
+video, _, _ = torchvision.io.read_video("video.mp4")
+video = video.permute(0, 3, 1, 2).float() / 255.0
+
+outputs = model.embed(video, is_video=True)
+watermarked = (outputs["imgs_w"] * 255).byte().permute(0, 2, 3, 1)
+torchvision.io.write_video("watermarked.mp4", watermarked, fps=30)
+```
+
+> 💡 **For standalone usage without dependencies**, see our [TorchScript guide](docs/torchscript.md) for pre-compiled models.
 
 ## Installation
 
@@ -77,36 +113,18 @@ pip install decord
 Note that there may be some issues with installing decord: https://github.com/dmlc/decord/issues/213
 Everything should be working without decord for inference, but there may be issues for training in this case.
 
-### Video Seal Models
+## Model Zoo
 
-#### Quick Model Loading
-```python
-# Automatically downloads and loads the default model (256-bit version)
-model = videoseal.load("videoseal")
-```
+We provide a comprehensive suite of watermarking models with different trade-offs between capacity, robustness, and imperceptibility.
 
-#### Available Models
+| Model | Capacity | Best For | Model Card | Checkpoint | Paper | Status |
+|:------|:--------:|:---------|:----------:|:----------:|:-----:|:------:|
+| **PixelSeal** | 256 bits | **SOTA Robustness & Imperceptibility** | [`pixelseal.yaml`](videoseal/cards/pixelseal.yaml) | [pixelseal/checkpoint.pth](https://dl.fbaipublicfiles.com/videoseal/pixelseal/checkpoint.pth) | [arXiv:2512.16874](https://arxiv.org/abs/2512.16874) | 🆕 New |
+| **ChunkySeal** | **1024 bits** | **High Capacity larger model** | [`chunkyseal.yaml`](videoseal/cards/chunkyseal.yaml) | [chunkyseal/checkpoint.pth](https://dl.fbaipublicfiles.com/videoseal/chunkyseal/checkpoint.pth) | [arXiv:2510.12812](https://arxiv.org/abs/2510.12812) | 🆕 New |
+| **VideoSeal v1.0** | 256 bits | **Stable** | [`videoseal_1.0.yaml`](videoseal/cards/videoseal_1.0.yaml) | [y_256b_img.pth](https://dl.fbaipublicfiles.com/videoseal/y_256b_img.pth) | [arXiv:2412.09492](https://arxiv.org/abs/2412.09492) | ✅ Stable |
+| VideoSeal v0.0 | 96 bits | Legacy Baseline | [`videoseal_0.0.yaml`](videoseal/cards/videoseal_0.0.yaml) | [rgb_96b.pth](https://dl.fbaipublicfiles.com/videoseal/rgb_96b.pth) | [arXiv:2412.09492](https://arxiv.org/abs/2412.09492) | 🟡 Legacy |
 
-- **Default Model (256-bit)**: 
-  - Model name: `videoseal_1.0`
-  - Download: [y_256b_img.pth](https://dl.fbaipublicfiles.com/videoseal/y_256b_img.pth)
-  - Best balance of efficiency and robustness
-  - Manual download:
-    ```bash
-    # For Linux/Windows:
-    wget https://dl.fbaipublicfiles.com/videoseal/y_256b_img.pth -P ckpts/
-    
-    # For Mac:
-    mkdir ckpts
-    curl -o ckpts/y_256b_img.pth https://dl.fbaipublicfiles.com/videoseal/y_256b_img.pth
-    ```
-
-- **Legacy Model (96-bit)**: December 2024 version
-  - Model name: `videoseal_0.0`
-  - Download: [rgb_96b.pth](https://dl.fbaipublicfiles.com/videoseal/rgb_96b.pth)
-  - More visible watermarks, a bit more robust on heavy crops
-
-Note: For complete model checkpoints (with optimizer states and discriminator), see [docs/training.md](docs/training.md). Video-optimized models (v1.0) should be released in the coming months.
+**Note**: For complete training checkpoints (with optimizer states and discriminators), see [docs/training.md](docs/training.md).
 
 
 ### Download the other models used as baselines
@@ -215,12 +233,20 @@ See [contributing](.github/CONTRIBUTING.md) and the [code of conduct](.github/CO
 
 Pierre Fernandez, Hady Elsahar, Tomas Soucek, Sylvestre Rebuffi, Alex Mourachko
 
-## Citation
+## 📜 Papers & Citations
 
-If you find this repository useful, please consider giving a star :star: and please cite as:
+If you find this repository useful, please consider giving a star ⭐ and cite the relevant papers:
+
+### VideoSeal: Open and Efficient Video Watermarking
+
+[![arXiv](https://img.shields.io/badge/arXiv-2412.09492-b31b1b.svg)](https://arxiv.org/abs/2412.09492)
+
+*Pierre Fernandez, Hady Elsahar, I. Zeki Yalniz, Alexandre Mourachko*
+
+**Demo**: [aidemos.meta.com/videoseal](https://aidemos.meta.com/videoseal)
 
 ```bibtex
-@article{fernandez2024video,
+@article{fernandez2024videoseal,
   title={Video Seal: Open and Efficient Video Watermarking},
   author={Fernandez, Pierre and Elsahar, Hady and Yalniz, I. Zeki and Mourachko, Alexandre},
   journal={arXiv preprint arXiv:2412.09492},
@@ -228,3 +254,56 @@ If you find this repository useful, please consider giving a star :star: and ple
 }
 ```
 
+### ChunkySeal: We Can Hide More Bits
+
+[![arXiv](https://img.shields.io/badge/arXiv-2510.12812-b31b1b.svg)](https://arxiv.org/abs/2510.12812)
+
+*Aleksandar Petrov, Pierre Fernandez, Tomáš Souček, Hady Elsahar*
+
+Despite rapid progress in deep learning-based image watermarking, the capacity of current robust methods remains limited to the scale of only a few hundred bits. This work establishes theoretical upper bounds on watermarking capacity and demonstrates **ChunkySeal**, which increases capacity 4× to **1024 bits** while preserving image quality and robustness.
+
+```bibtex
+@misc{petrov2025hidebits,
+  title={We Can Hide More Bits: The Unused Watermarking Capacity in Theory and in Practice}, 
+  author={Aleksandar Petrov and Pierre Fernandez and Tom\'{a}\v{s} Sou\v{c}ek and Hady Elsahar},
+  year={2025},
+  eprint={2510.12812},
+  archivePrefix={arXiv},
+  primaryClass={cs.CR},
+  url={https://arxiv.org/abs/2510.12812}
+}
+```
+
+### PixelSeal: Adversarial-Only Training for Invisible Watermarking
+
+[![arXiv](https://img.shields.io/badge/arXiv-2512.16874-b31b1b.svg)](https://arxiv.org/abs/2512.16874)
+
+*Tomáš Souček\*, Pierre Fernandez\*, Hady Elsahar, Sylvestre-Alvise Rebuffi, Valeriu Lacatusu, Tuan Tran, Tom Sander, Alexandre Mourachko*
+
+This work introduces **adversarial-only training** that eliminates unreliable perceptual losses, achieving state-of-the-art robustness and imperceptibility. PixelSeal addresses optimization instability and resolution scaling challenges through a three-stage training schedule and JND-based attenuation.
+
+```bibtex
+@article{soucek2025pixelseal,
+  title={Pixel Seal: Adversarial-only Training for Invisible Image and Video Watermarking},
+  author={Sou\v{c}ek, Tom\'{a}\v{s} and Fernandez, Pierre and Elsahar, Hady and Rebuffi, Sylvestre-Alvise and Lacatusu, Valeriu and Tran, Tuan and Sander, Tom and Mourachko, Alexandre},
+  journal={arXiv preprint arXiv:2512.16874},
+  year={2025}
+}
+```
+
+### WmForger: Black-Box Watermark Forging Attack
+
+[![arXiv](https://img.shields.io/badge/arXiv-2510.20468-b31b1b.svg)](https://arxiv.org/abs/2510.20468)
+
+*Tomáš Souček, Sylvestre-Alvise Rebuffi, Pierre Fernandez, Nikola Jovanović, Hady Elsahar, Valeriu Lacatusu, Tuan Tran, Alexandre Mourachko*
+
+**NeurIPS 2025 Spotlight** 🏅 | [Virtual Site](https://neurips.cc/virtual/2025/loc/san-diego/poster/115131)
+
+```bibtex
+@inproceedings{soucek2025wmforger,
+  title={Transferable Black-Box One-Shot Forging of Watermarks via Image Preference Models},
+  author={Sou\v{c}ek, Tom\'{a}\v{s} and Rebuffi, Sylvestre-Alvise and Fernandez, Pierre and Jovanović, Nikola and Elsahar, Hady and Lacatusu, Valeriu and Tran, Tuan and Mourachko, Alexandre},
+  booktitle={Advances in Neural Information Processing Systems},
+  year={2025}
+}
+```

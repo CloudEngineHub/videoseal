@@ -39,12 +39,15 @@ class VideosealConfig:
     extractor: SubModelConfig
 
 
-@dataclass
-class VideosealConfig:
-    """Configuration for a Video Seal model."""
-    args: DictConfig
-    embedder: SubModelConfig
-    extractor: SubModelConfig
+def resolve_config_path(cfg_path):
+    # Resolve the config path in the following order:
+    # 1. Search from the working directory
+    # 2. Search from the package directory (for pip-installed packages)
+    if not Path(cfg_path).is_file():
+        # Use parents[1] to resolve relative to the videoseal package root
+        cfg_path = Path(__file__).parents[1].joinpath(cfg_path)
+
+    return cfg_path
 
 
 def get_config_from_checkpoint(ckpt_path: Path) -> VideosealConfig:
@@ -65,8 +68,10 @@ def get_config_from_checkpoint(ckpt_path: Path) -> VideosealConfig:
         raise Exception("Expected logfile to contain params dictionary.")
 
     # Load sub-model configurations
-    embedder_cfg = OmegaConf.load(args.embedder_config)
-    extractor_cfg = OmegaConf.load(args.extractor_config)
+    embedder_cfg_path = resolve_config_path(args.embedder_config)
+    embedder_cfg = OmegaConf.load(embedder_cfg_path)
+    extractor_cfg_path = resolve_config_path(args.extractor_config)
+    extractor_cfg = OmegaConf.load(extractor_cfg_path)
 
     # Create sub-model configurations
     embedder_model = args.embedder_model or embedder_cfg.model
@@ -105,6 +110,14 @@ def setup_model(config: VideosealConfig, ckpt_path: Path) -> Videoseal:
     else:
         args.hidden_size_multiplier = 2
 
+    # Handle backward compatibility for videowam_* parameter names (from 1210-oss branch)
+    # If old parameter names exist (videowam_chunk_size, videowam_step_size), 
+    # use them to set the new names (videoseal_chunk_size, videoseal_step_size)
+    if "videowam_chunk_size" in args and "videoseal_chunk_size" not in args:
+        args.videoseal_chunk_size = args.videowam_chunk_size
+    if "videowam_step_size" in args and "videoseal_step_size" not in args:
+        args.videoseal_step_size = args.videowam_step_size
+
     # Build models
     embedder = build_embedder(config.embedder.model, config.embedder.params, args.nbits, args.hidden_size_multiplier)
     extractor = build_extractor(config.extractor.model, config.extractor.params, args.img_size, args.nbits)
@@ -112,7 +125,8 @@ def setup_model(config: VideosealConfig, ckpt_path: Path) -> Videoseal:
 
     # Build attenuation
     if args.attenuation.lower().startswith("jnd"):
-        attenuation_cfg = omegaconf.OmegaConf.load(args.attenuation_config)
+        attenuation_cfg_path = resolve_config_path(args.attenuation_config)
+        attenuation_cfg = omegaconf.OmegaConf.load(attenuation_cfg_path)
         attenuation = JND(**attenuation_cfg[args.attenuation])
     else:
         attenuation = None
@@ -154,8 +168,10 @@ def setup_model_from_checkpoint(ckpt_path: str) -> Videoseal:
     if "baseline" in ckpt_path:
         method = ckpt_path.split('/')[-1]
         return build_baseline(method)
-    # load videoseal model card
-    elif ckpt_path.startswith('videoseal'):
+    # load model card - check if it's a model card name (not a path)
+    # Model cards are YAML files in videoseal/cards/ directory
+    elif not ckpt_path.endswith('.pth') and '/' not in ckpt_path:
+        # This is likely a model card name (e.g., 'videoseal', 'chunkyseal', 'pixelseal')
         return setup_model_from_model_card(ckpt_path)
     # load videoseal ckpts
     else:
@@ -171,7 +187,8 @@ def setup_model_from_model_card(model_card: Path | str) -> Videoseal:
     Returns:
         Videoseal: Loaded model.
     """
-    cards_dir = Path("videoseal/cards")
+    # Use package-relative path for pip-installed packages
+    cards_dir = Path(__file__).parent.parent / "cards"
     if model_card == 'videoseal':
         model_card = DEFAULT_CARD
 
@@ -245,18 +262,6 @@ def is_url(string):
 
 
 def maybe_download_checkpoint(url):
-    """
-    Download checkpoint from URL if not already cached locally.
-    
-    Creates unique filenames using parent_dir_filename pattern to avoid collisions.
-    Example: ".../chunkyseal/checkpoint.pth" -> "ckpts/chunkyseal_checkpoint.pth"
-    
-    Args:
-        url (str): Checkpoint URL
-        
-    Returns:
-        str: Absolute path to checkpoint file
-    """
     try:
         # Extract path components to create unique filename
         # For URLs like .../videoseal/chunkyseal/checkpoint.pth, use chunkyseal_checkpoint.pth
