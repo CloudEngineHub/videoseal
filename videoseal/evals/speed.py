@@ -183,6 +183,10 @@ def main():
                         help='The number of frames to propagate the watermark to')
     group.add_argument('--videoseal_mode', type=str, default='repeat', 
                         help='The inference mode for videos')
+    group.add_argument('--time_pooling_depth', type=int, default=None,
+                        help='The depth of the UNet at which to apply temporal pooling. '
+                             'When set, enables temporal pooling which reduces frames processed '
+                             'in deeper UNet layers for faster inference.')
 
     group = parser.add_argument_group('Interpolation')
     group.add_argument('--interpolation_mode', type=str, default='bilinear',
@@ -243,6 +247,20 @@ def main():
             model.video_mode = args.videoseal_mode or model.mode
         if hasattr(model, 'img_size'):
             model.img_size = args.img_size_proc or model.img_size
+
+        # Override temporal pooling settings on the embedder's UNet.
+        # When time_pooling is enabled, frames are pooled at a specific UNet depth,
+        # reducing computation by processing fewer frames through deeper layers.
+        # The kernel_size is set to step_size, and step_size is then set to 1
+        # since the temporal pooling handles the frame aggregation instead.
+        if hasattr(model, 'embedder') and hasattr(model.embedder, 'unet') and hasattr(model.embedder.unet, 'time_pooling'):
+            if args.time_pooling_depth is not None:
+                model.embedder.unet.time_pooling = True
+                model.embedder.unet.time_pooling_depth = args.time_pooling_depth
+                model.embedder.unet.temporal_pool.kernel_size = model.step_size
+                # When using temporal pooling, step_size becomes 1 since
+                # frame aggregation is handled by the temporal pooling layer.
+                model.step_size = 1
         
         # Record checkpoint path
         model.checkpoint_path = checkpoint_path
