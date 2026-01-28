@@ -11,7 +11,7 @@
 import torch
 from torch import nn
 
-from .common import Upsample, Downsample, get_activation, get_normalization, get_conv_layer
+from .common import AvgPool3dWrapper, Upsample, Downsample, get_activation, get_normalization, get_conv_layer
 
 
 class ResnetBlock(nn.Module):
@@ -56,10 +56,10 @@ class ResnetBlock(nn.Module):
 
 
 class UBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, act_layer, norm_layer, upsampling_type='bilinear', id_init=False, conv_layer=nn.Conv2d):
+    def __init__(self, in_channels, out_channels, act_layer, norm_layer, norm_layer_upsample=None, upsampling_type='bilinear', id_init=False, conv_layer=nn.Conv2d):
         super().__init__()
         self.up = Upsample(upsampling_type, in_channels,
-                           out_channels, 2, act_layer)
+                           out_channels, 2, act_layer, norm_layer_upsample)
         self.conv = ResnetBlock(
             out_channels, out_channels, act_layer, norm_layer, id_init=id_init, conv_layer=conv_layer)
 
@@ -122,7 +122,13 @@ class UNetMsg(nn.Module):
         last_tanh: bool = True,
         zero_init: bool = False,
         id_init: bool = False,
-        conv_layer: str = "conv2d"
+        conv_layer: str = "conv2d",
+        time_pooling: bool = False,
+        time_pooling_kernel_size: int = 1,
+        time_pooling_depth: int = 1,
+        time_pooling_stride: int = None,
+        normalization_up: str = 'layer',
+        *args, **kwargs
     ):
         super(UNetMsg, self).__init__()
         self.msg_processor = msg_processor
@@ -134,61 +140,101 @@ class UNetMsg(nn.Module):
         self.last_tanh = last_tanh
         self.connect_scale = 2 ** -0.5
 
+        # select layers and activations
         norm_layer = get_normalization(normalization)
+        norm_layer_upsample = get_normalization(normalization_up)  # Ensure backward compatibility for norm_layer without data_format argument
         act_layer = get_activation(activation)
         conv_layer = get_conv_layer(conv_layer)
 
         # Calculate the z_channels for each layer based on z_channels_mults
-        z_channels = [self.z_channels * m for m in self.z_channels_mults]
+        z_channels_list = [self.z_channels * m for m in self.z_channels_mults]
 
         # Initial convolution
         self.inc = ResnetBlock(
-            in_channels, z_channels[0], act_layer, norm_layer, id_init=id_init, conv_layer=conv_layer)
+            in_channels, z_channels_list[0], act_layer, norm_layer, id_init=id_init, conv_layer=conv_layer)
 
         # Downward path
         self.downs = nn.ModuleList()
-        for ii in range(len(z_channels) - 1):
+        for ii in range(len(z_channels_list) - 1):
             self.downs.append(DBlock(
-                z_channels[ii], z_channels[ii + 1], act_layer, norm_layer, downsampling_type, id_init, conv_layer=conv_layer))
+                z_channels_list[ii], z_channels_list[ii + 1], act_layer, norm_layer, downsampling_type, id_init, conv_layer=conv_layer))
 
         # Message mixing and middle blocks
-        z_channels[-1] = z_channels[-1] + self.msg_processor.hidden_size
+        z_channels_list[-1] = z_channels_list[-1] + self.msg_processor.hidden_size
         self.bottleneck = BottleNeck(
-            num_blocks, z_channels[-1], z_channels[-1], act_layer, norm_layer, id_init=id_init, conv_layer=conv_layer)
+            num_blocks, z_channels_list[-1], z_channels_list[-1], act_layer, norm_layer, id_init=id_init, conv_layer=conv_layer)
 
         # Upward path
         self.ups = nn.ModuleList()
-        for ii in reversed(range(len(z_channels) - 1)):
+        for ii in reversed(range(len(z_channels_list) - 1)):
             self.ups.append(UBlock(
-                2 * z_channels[ii + 1], z_channels[ii], act_layer, norm_layer, upsampling_type, id_init, conv_layer=conv_layer))
+                2 * z_channels_list[ii + 1], z_channels_list[ii], act_layer, norm_layer, norm_layer_upsample, upsampling_type, id_init, conv_layer=conv_layer))
 
         # Final output convolution
-        self.outc = nn.Conv2d(z_channels[0], out_channels, 1)
+        self.outc = nn.Conv2d(z_channels_list[0], out_channels, 1)
         if zero_init:
             self.zero_init_(self.outc)
+        
+        # time_pooling
+        self.time_pooling = time_pooling
+        self.time_pooling_depth = time_pooling_depth
+        self.temporal_pool = AvgPool3dWrapper(
+            time_pooling_kernel_size, 
+            time_pooling_stride, 
+            padding=0, ceil_mode=True, count_include_pad=False,
+        )
 
     def forward(self,
                 imgs: torch.Tensor,
                 msgs: torch.Tensor
                 ):
+        nb_imgs: int = len(imgs)
         # Initial convolution
         x1 = self.inc(imgs)
         hiddens = [x1]
 
         # Downward path
-        for dblock in self.downs:
-            hiddens.append(dblock(hiddens[-1]))  # b d h w -> b d' h/2 w/2
+        for ii, dblock in enumerate(self.downs):
+            if self.time_pooling and ii == self.time_pooling_depth:
+                temp_downscale = self.temporal_pool(hiddens[-1])  # b d h w -> b/k d h w
+                hiddens.append(dblock(temp_downscale))
+            else:
+                hiddens.append(dblock(hiddens[-1]))  # b d h w -> b d' h/2 w/2
 
         # Middle path
+        if self.time_pooling:
+            # first dim may have changed because of time pooling, trim msgs.
+            if len(msgs) != len(hiddens[-1]):
+                tpks = self.temporal_pool.kernel_size
+                tps = self.temporal_pool.stride
+                assert tps == tpks
+                last_msg = msgs[-1].unsqueeze(0)
+                msgs = msgs[(tpks//2)::tpks]
+                if (len(msgs) * tpks) < nb_imgs:
+                    msgs = torch.cat([msgs, last_msg])
+        # Process latents and messages.
         hiddens.append(self.msg_processor(hiddens.pop(), msgs))  # b c+c' h w
         x = self.bottleneck(hiddens[-1])
-
         # Upward path
-        def concat_skip_connect(x): return torch.cat(
-            (x, hiddens.pop() * self.connect_scale), dim=1)
-        for ublock in self.ups:
-            x = concat_skip_connect(x)  # b d h w -> b 2d h w
+        current_depth = len(self.downs)
+        for ii, ublock in enumerate(self.ups):
+            # Recover the original number of frames for temporal pooling.
+            if self.time_pooling and current_depth == self.time_pooling_depth:
+                x = torch.repeat_interleave(x, repeats=self.temporal_pool.kernel_size, dim=0)  # b/k d h w -> b d h w
+                x = x[:nb_imgs]
+            
+            skip_connection = hiddens.pop()
+            x = torch.cat(
+                (x, skip_connection * self.connect_scale), 
+                dim=1
+            )  # b d h w -> b 2d h w
             x = ublock(x)  # b d h w
+            current_depth -= 1
+            
+        # Recover the original number of frames for temporal pooling.
+        if self.time_pooling and current_depth == self.time_pooling_depth:
+            x = torch.repeat_interleave(x, repeats=self.temporal_pool.kernel_size, dim=0)  # b/k d h w -> b d h w
+            x = x[:nb_imgs]
 
         # Output layer
         logits = self.outc(x)
