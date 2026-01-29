@@ -19,6 +19,7 @@ class Upsample(nn.Module):
         out_channels: int, 
         up_factor: int, 
         activation: nn.Module, 
+        norm_layer: nn.Module = None,
         bias: bool = False
     ) -> None:
         """
@@ -29,17 +30,20 @@ class Upsample(nn.Module):
             out_channels (int): the output channel dimension
             up_factor (int): the upscaling factor
             activation (nn.Module): the type of activation to use
+            norm_layer (nn.Module): the type of normalization to use (default: LayerNorm)
             bias (bool): whether to use bias in the convolution
         Returns:
             nn.Module: the upscaling block
         """
         super(Upsample, self).__init__()
+        if norm_layer is None:
+            norm_layer = LayerNorm
         if upscale_type == 'nearest':
             upsample_block = nn.Sequential(
                 nn.Upsample(scale_factor=up_factor, mode='nearest'),
                 nn.ReflectionPad2d(1),
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=bias),
-                LayerNorm(out_channels, data_format="channels_first"),
+                norm_layer(out_channels),
                 activation(),
             )
         elif upscale_type == 'bilinear':
@@ -47,20 +51,20 @@ class Upsample(nn.Module):
                 nn.Upsample(scale_factor=up_factor, mode='bilinear', align_corners=bias),
                 nn.ReflectionPad2d(1),
                 nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=1, padding=0, bias=bias),
-                LayerNorm(out_channels, data_format="channels_first"),
+                norm_layer(out_channels),
                 activation(),
             )
         elif upscale_type == 'conv':
             upsample_block = nn.Sequential(
                 nn.ConvTranspose2d(in_channels, out_channels, kernel_size=up_factor, stride=up_factor),
-                LayerNorm(out_channels, data_format="channels_first"),
+                norm_layer(out_channels),
                 activation(),
             )
         elif upscale_type == 'pixelshuffle':
             conv = nn.Conv2d(in_channels, out_channels * up_factor ** 2, kernel_size=1, bias=False)
             upsample_block = nn.Sequential(
                 conv,
-                LayerNorm(out_channels * up_factor ** 2, data_format="channels_first"),
+                norm_layer(out_channels * up_factor ** 2),
                 activation(),
                 nn.PixelShuffle(up_factor),
             )
@@ -266,3 +270,35 @@ def get_conv_layer(name: str):
         return Conv2p1dWrapper
     else:
         raise NotImplementedError
+
+
+class AvgPool3dWrapper(nn.Module):
+    def __init__(self, kernel_size=3, stride=None, padding=0, ceil_mode=True, count_include_pad=False):
+        """
+        Wrapper class for 3D average pooling to handle 4D input tensors. Almost reimplementation of AvgPool3d.
+        Args:
+            kernel_size: Size of pooling kernel
+            stride: Stride of pooling operation 
+            padding: Padding size
+            ceil_mode: Whether to use ceil or floor for computing output size
+            count_include_pad: Whether to include padding in averaging calculation
+        """
+        super().__init__()
+        self.kernel_size = kernel_size
+        self.stride = kernel_size if stride is None else stride
+        self.padding = padding
+        self.ceil_mode = ceil_mode
+        self.count_include_pad = count_include_pad
+
+    def forward(self, x):
+        assert len(x.shape) == 4
+        x = x.unsqueeze(0).permute(0, 2, 1, 3, 4) # change [B, C, H, W] to [1, C, T, H, W]
+        x = F.avg_pool3d(
+            x, 
+            (self.kernel_size, 1, 1),
+            (self.stride, 1, 1),
+            self.padding, 
+            ceil_mode=self.ceil_mode, count_include_pad=self.count_include_pad
+        )
+        x = x.permute(0, 2, 1, 3, 4).squeeze(0)
+        return x
