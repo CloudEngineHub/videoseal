@@ -11,7 +11,6 @@ Test with:
 import os
 import ffmpeg
 import numpy as np
-import subprocess
 import torch
 import tqdm
 
@@ -45,8 +44,7 @@ def embed_video(
     fps = float(video_info["r_frame_rate"].split("/")[0]) / float(
         video_info["r_frame_rate"].split("/")[1]
     )
-    codec = video_info["codec_name"]
-    num_frames = int(probe["streams"][0]["nb_frames"])
+    num_frames = int(video_info["nb_frames"])
 
     # Open the input video
     process1 = (
@@ -58,7 +56,7 @@ def embed_video(
             s="{}x{}".format(width, height),
             r=fps,
         )
-        .run_async(pipe_stdout=True, pipe_stderr=subprocess.PIPE)
+        .run_async(pipe_stdout=True, pipe_stderr=False)
     )
     # Open the output video with optimal thread usage.
     process2 = (
@@ -69,9 +67,9 @@ def embed_video(
             s="{}x{}".format(width, height),
             r=fps,
         )
-        .output(output_path, vcodec="libx264", pix_fmt="yuv420p", r=fps)
+        .output(output_path, vcodec="libx264", pix_fmt="yuv420p", crf=crf, r=fps)
         .overwrite_output()
-        .run_async(pipe_stdin=True, pipe_stderr=subprocess.PIPE)
+        .run_async(pipe_stdin=True, pipe_stderr=False)
     )
 
     # Create a random message
@@ -131,13 +129,13 @@ def detect_video(model: Videoseal, input_path: str, chunk_size: int) -> None:
     )
     width = int(video_info["width"])
     height = int(video_info["height"])
-    num_frames = int(probe["streams"][0]["nb_frames"])
+    num_frames = int(video_info["nb_frames"])
 
     # Open the input video
     process1 = (
         ffmpeg.input(input_path)
         .output("pipe:", format="rawvideo", pix_fmt="rgb24")
-        .run_async(pipe_stdout=True, pipe_stderr=subprocess.PIPE)
+        .run_async(pipe_stdout=True, pipe_stderr=False)
     )
 
     # Process the video
@@ -204,7 +202,7 @@ def main(args):
                 acodec="copy",
             )
             .overwrite_output()
-            .run_async(pipe_stderr=subprocess.PIPE)
+            .run_async(pipe_stderr=False)
         )
         process3.wait()
         os.remove(temp_output)
